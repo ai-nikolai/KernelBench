@@ -56,7 +56,7 @@ __global__ void matmul_tiled_kernel(const float* __restrict__ A, const float* __
         C[row * N + col] = C_value;
 }
 
-torch::Tensor forward(torch::Tensor A, torch::Tensor B) {
+torch::Tensor custom_mm_forward(torch::Tensor A, torch::Tensor B) {
     CHECK_INPUT(A);
     CHECK_INPUT(B);
     CHECK_FLOAT(A);
@@ -91,8 +91,8 @@ torch::Tensor forward(torch::Tensor A, torch::Tensor B) {
 #     m.def("forward", &forward, "Matrix multiplication kernel (CUDA)");
 # }
 
-cpp_declaration="""
-torch::Tensor forward(
+cpp_src="""
+torch::Tensor custom_mm_forward(
     torch::Tensor A, torch::Tensor B);
 """
 
@@ -102,7 +102,7 @@ custom_mm = load_inline(
     name="custom_mm", # Changed name to avoid collision
     cpp_sources=cpp_src,
     cuda_sources=cuda_src,
-    functions=["forward"],
+    functions=["custom_mm_forward"],
     verbose=True, 
     extra_cuda_cflags=["-arch=sm_70", "--use_fast_math", "-std=c++17"] 
 )
@@ -127,7 +127,7 @@ class ModelNew(nn.Module):
         Returns:
             torch.Tensor: Output matrix C of shape (N, N).
         """
-        return custom_mm.forward(A,B)
+        return custom_mm.custom_mm_forward(A,B)
 
 N = 2048 * 2
 

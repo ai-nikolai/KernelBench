@@ -2,3 +2,5 @@ numpy==2.3.3
 torch==2.8.0
 tqdm==4.67.1
 datasets==4.0.0
+pydantic==2.11.9 #this is needed (for eval results from KernelBench)
+ninja==1.13.0 #this is needed to compile C++ extensions for Pytorch...
