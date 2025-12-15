@@ -1,16 +1,19 @@
 # KernelBench: Can LLMs Write Efficient GPU Kernels? [ICML '25]
-[arXiv](https://arxiv.org/html/2502.10517v1) | [blog post](https://scalingintelligence.stanford.edu/blogs/kernelbench/) | [HuggingFace Dataset](https://huggingface.co/datasets/ScalingIntelligence/KernelBench) | 
-
-## Versions
-The huggingface dataset is updated to v0.1.
-- [v0.1](https://github.com/ScalingIntelligence/KernelBench/tree/v0.1) - Latest version (also main branch)
-- [v0](https://github.com/ScalingIntelligence/KernelBench/tree/v0) - Original Release
-
 A benchmark for evaluating LLMs' ability to generate efficient GPU kernels
+
+[arXiv](https://arxiv.org/html/2502.10517v1) | [blog post](https://scalingintelligence.stanford.edu/blogs/kernelbench/) | [HuggingFace Dataset](https://huggingface.co/datasets/ScalingIntelligence/KernelBench) 
 
 <img src="./assets/figures/KernelBenchMascot.png" width="200">
 
-<!-- See [blog post](https://scalingintelligence.stanford.edu/blogs/kernelbench/) and [arXiv paper](https://arxiv.org/html/2502.10517v1) for more details. -->
+## Versions
+The latest stable version will be on `main` branch. We continue to update and improve the repo. 
+- [v0.1](https://github.com/ScalingIntelligence/KernelBench/tree/v0.1) - See [blog](https://scalingintelligence.stanford.edu/blogs/kernelbenchv01/)
+- [v0](https://github.com/ScalingIntelligence/KernelBench/tree/v0) - Original Release
+
+
+The Huggingface [dataset](https://huggingface.co/datasets/ScalingIntelligence/KernelBench) is updated to v0.1.
+
+This repo provides core functionality for KernelBench and an easy-to-use set of scripts for evaluation. It is not intended to provide complex agentic scaffolds that solve this task; we recommend cloning and modifying this repo for your experiment, or using it as a git submodule.
 
 ## 👋 Task Description
 We structure the problem for LLM to transpile operators described in PyTorch to CUDA kernels, at whatever level of granularity it desires to.
@@ -26,6 +29,8 @@ We construct KernelBench to have 4 Levels of categories:
 - **Level 4 🤗**:  Level Hugging Face 
     Optimize whole model architectures from HuggingFace
 
+We are actively extending KernelBench to other DSLs beyond `cuda` as well (see below).
+
 ## ⚖️ Evaluation
 #### Methodology
 To evaluate model-generated kernels, we need to check if they:
@@ -34,7 +39,7 @@ To evaluate model-generated kernels, we need to check if they:
 
 Check out `src/eval.py` for details on how we implement correctness check and timing. 
 
-We provide a convenient script `scripts/run_and_check.py` to evaluate one single sample source code against a reference source code, check correctness and compute speedup. You can use this to evaluate a model-generated kernel. 
+We provide a convenient script `scripts/run_and_check.py` to evaluate one single sample source code against a reference source code, check correctness and compute speedup. You can use this to evaluate a kernel either locally or remotely by setting `eval_mode=local` or `eval_mode=modal`.
 
 #### Overall Benchmark Metric
 
@@ -46,6 +51,7 @@ Some examples to illustrate this metric that filters based on speedups:
 * `fast_0` is the fraction of tasks that LM-generated kernels are **correct**. (same as correctness rate)
 
 You can increase speedup threshold `p` to make the task more challenging.
+
 
 #### Compute Overall Benchmark Performance
 
@@ -77,14 +83,16 @@ pip install -r requirements.txt
 pip install -e . 
 ```
 
-To call LLM API providers, set your `{INFERENCE_SERVER_PROVIDER}_API_KEY` API key.
+We use `litellm` for API calls. Please set your keys by creating a `.env` following our `.env.example`.
 
 Running and profiling kernels require a GPU. 
-If you don't have GPU available locally, you can set up [Modal](https://modal.com/). Set up your modal token after creating an account by running `modal token new`. Then, use the `generate_and_eval_single_sample_modal.py` script.
+If you don't have GPU available locally, you can set up [Modal](https://modal.com/). Set up your modal token after creating an account by running `modal token new`. Then, use the `generate_and_eval_single_sample_modal.py` script.  
+
+You can also try out our [tutorial notebook](https://bit.ly/kernelbench-neurips-colab) (also in notebooks/tutorial.ipynb) with Google Colab.
 
 ## 🚀 Usage
 ### Run on a single problem 
-It is easier to get started with a single problem. This will fetch the problem, generate a sample, and evaluate the sample.
+It is easier to get started with a single problem. This will fetch the problem, generate a sample, and evaluate the sample. 
 
 ```
 # for example, run level 2 problem 40 from huggingface
@@ -94,6 +102,13 @@ python3 scripts/generate_and_eval_single_sample.py dataset_src="huggingface" lev
 # dataset_src could be "local" or "huggingface"
 # add .verbose_logging for more visbility
 ```
+
+**What you might need to modify**
+* **`gpu_arch`** - Depend on your GPU, you might need to adjust the `gpu_arch` argument to reflect your hardware.
+* **`precision`** - You can specify the precision of tensor by `precision=fp32`. Currently all of our reported results are `fp32` but we added support for `fp16` & `bf16`.
+*  **`backend`** - We are also supporting other GPU programming languages beyond `cuda`. Simply specify `backend=triton`. For now we support DSLs: `cuda`, `triton`, `cute`, `tilelang`.
+
+Check the config fields for comprehensive set of options. Note we provide the model with a one-shot example by default along with the minimum set of info; you can check out other prompt settings or construct your own in `src/prompt_constructor_toml.py`.
 
 ### Run on all problems 
 
@@ -117,28 +132,13 @@ If you are using a different hardware, you can generate the baseline time with `
 We provide some reference baseline times a variety of NVIDIA GPUs across generations in `results/timing`, but we recommend you to generate your own baseline time for more accurate results (cluster power, software version, all affects timing result). See `results/timing/README.md` for more details.
 
 ### Multi-Turn Framework
-We have also releaed the test-time framework [Caesar](https://github.com/simonguozirui/caesar) that are used in the multi-turn / iterative refinement experiments in our paper. You can use or modify this framework for high-throughput test-time scaling (both sequential and parallel) targeting KernelBench problems. 
+We have also releaed the test-time framework [Caesar](https://github.com/ScalingIntelligence/caesar) that are used in the multi-turn / iterative refinement experiments in our paper. You can use or modify this framework for high-throughput test-time scaling (both sequential and parallel) targeting KernelBench problems. 
 
 ## 🛣️ Upcoming Roadmap
-- [ ] Triton Variant (To be merged)
-- [ ] Easy to use CoLab Notebook Example
-- [ ] Push button flow on Modal / Cloud Provider 
-- [ ] Integrate with more frameworks, such as [ThunderKittens](https://github.com/HazyResearch/ThunderKittens)
-- [ ] Add backward pass
-- [ ] Integrate with toolchains such as NCU
-See Issues for the ongoing roadmap and directions.
-
-
+Check out our [roadmap](https://github.com/ScalingIntelligence/KernelBench/issues/74) for what we plan to add as features. We welcome community contirbutions in these directions. 
 
 ## 🔍 Known Usage
-- [NVIDIA](https://developer.nvidia.com/blog/automating-gpu-kernel-generation-with-deepseek-r1-and-inference-time-scaling/) - Automating GPU Kernel Generation with DeepSeek-R1 and Inference Time Scaling
-- [METR](https://metr.org/blog/2025-02-14-measuring-automated-kernel-engineering/) - Measuring Automated Kernel Engineering
-- [Sakana AI](https://sakana.ai/ai-cuda-engineer/) - AI Cuda Engineer
-- [Project Popcorn](https://www.youtube.com/watch?v=mdDVkBeFy9A) - Triton Support for KernelBench, Data Scaling + SFT'd Kernel LLM
-- [Kevin](https://cognition.ai/blog/kevin-32b) - Kevin-32B: Multi-Turn RL for Writing CUDA Kernels
-- [Simple Test-Time Search](https://scalingintelligence.stanford.edu/blogs/fastkernels/) - by @anneouyang
-
-If you are using KernelBench, we love to hear more about it!
+Since release, we have gotten a lot of interest from researchers, research labs, and companies that use KernelBench to explore this direction. We have documented [known usage](https://docs.google.com/document/d/e/2PACX-1vTjS-UMH1HB5n_PENq2k-3YRfXIXkqKIKeNC2zcWMyLPdl4Jrwvdk4dNDVSsM8ybKrCxZB7GJq1slZF/pub) of KernelBench and related efforts towards automated kernel generations. If you are using KernelBench, we love to hear more about it!
 
 ## 🪪 License
 MIT. Check `LICENSE.md` for more details.
